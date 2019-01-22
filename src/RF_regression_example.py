@@ -181,3 +181,28 @@ plt.show()
 # the other explanatory variables, rather than just the average, since the
 # relationship may not hold across the entire parameter space (and could be
 # quite different!)
+
+# Lets do that quickly now for the house age example
+plt.figure(4, facecolor='White',figsize=[5,5])
+ax = plt.subplot2grid((1,1),(0,0))
+
+N_iterations = 20
+for i in range(0,N_iterations):
+    sample_row = np.random.randint(0,X.shape[0]+1)
+    X_AGE_i = np.zeros((AGE_.size,n_variables))
+    for j in range(0,n_variables):
+        if j == 6:
+            X_AGE_i[:,j] = AGE_.copy()
+        else:
+            X_AGE_i[:,j] = (X[sample_row,j])
+
+    # predict with rf model
+    y_AGE_i = rf.predict(X_AGE_i)
+    ax.plot(AGE_, y_AGE_i,'-',c='0.5',linewidth=0.5)
+
+ax.plot(AGE_, y_AGE,'-') # also plot line from before for comparison
+ax.set_xlabel("percentage homes built prior to 1940")
+ax.set_ylabel("Median house price / $1000s")
+plt.tight_layout()
+plt.savefig('test_partial_deps_3.png')
+plt.show()
