@@ -19,24 +19,30 @@ import seaborn as sns
 sns.set()
 
 #===============================================================================
-# LOAD IN SOME DATA, saved as a pandas dataframe
-# - AGB (Mg/ha)
-# - Latitiude
-# - Longitude
-# - WorldClim climatology estimates (10 variables)
-# - Soilgrids soil texture estimates (3 variables)
-# - flag: training data = 1
+# LOAD IN SOME DATA,
+# Data Set Characteristics:
+# Number of Instances: 506
+# Number of Attributes: 13 numeric/categorical predictive. Median Value
+#    (attribute 14) is usually the target.
+# Attribute Information (in order):
+# - CRIM per capita crime rate by town
+# - ZN proportion of residential land zoned for lots over 25,000 sq.ft.
+# - INDUS proportion of non-retail business acres per town
+# - CHAS Charles River dummy variable (= 1 if tract bounds river; 0 otherwise)
+# - NOX nitric oxides concentration (parts per 10 million)
+# - RM average number of rooms per dwelling
+# - AGE proportion of owner-occupied units built prior to 1940
+# - DIS weighted distances to five Boston employment centres
+# - RAD index of accessibility to radial highways
+# - TAX full-value property-tax rate per $10,000
+# - PTRATIO pupil-teacher ratio by town
+# - MEDV Median value of owner-occupied homes in $1000’s
+# Creator:
+#    Harrison, D. and Rubinfeld, D.L., 1980
 #-------------------------------------------------------------------------------
-data = np.load('filename.npz') # load data
 data = load_boston()
-X=data['data'][:,:13]
+X=data['data'][:,:11]
 y=data['data'][:,-1]
-#===============================================================================
-# PREPROCESSING
-#-------------------------------------------------------------------------------
-training_mask = data[:,-1] == 1  # a mask to find rows that are marked as training data
-X = data[training_mask,1:-1] # this takes all training data rows, and the data from the third column to the penulitimate column
-y = data[training_mask,0]
 
 #===============================================================================
 # CAL-VAL
@@ -98,6 +104,80 @@ ax_b.annotate('validation R$^2$ = %.02f\nRMSE = %.02f'
             horizontalalignment='left', verticalalignment='top')
 ax_a.axis('equal')
 plt.savefig('test_rf.png')
+plt.show()
 
-
+#===============================================================================
+# VARIABLE IMPORTANCES
+#-------------------------------------------------------------------------------
 # fit the full model
+rf.fit(X,y)
+cal_score_full = rf.score(X,y)
+print("Calibration R$^2$ = %.02f" % cal_score_full)
+
+# get variable importances
+names = data["feature_names"][:11]
+importances = rf.feature_importances_
+print('Variables listed in order of importance')
+print sorted(zip(map(lambda x: round(x, 4), importances), names), reverse=True)
+
+#===============================================================================
+# USING PARTIAL DEPENDENCIES TO UNDERSTAND FUNCTIONAL EFFECTS
+#-------------------------------------------------------------------------------
+# Importances tell you which variables were important in determining the target
+# variable, but we still don't know how these explanatory variables effect the
+# system (just that they are important). This is one drawback of using a non-
+# parametric machine learning algorithm.
+# One way to sort-of sidestep this difficulty is to use partial dependencies.
+# Partial dependencies are the random forest equivalent to partial differentials
+# of multivariate equations.
+# We can plot partial dependencies by holding all variables but for the one of
+# interest constant (e.g. the mean values for the other variables), then
+# fitting the model across the range of the variable of interest. We'll try
+# this now.
+n_variables=X.shape[1]
+RM_ = np.arange(np.min(X[:,5]),np.max(X[:,5])+1)
+X_RM = np.zeros((RM_.size,n_variables))
+for i in range(0,n_variables):
+    if i == 5:
+        X_RM[:,i] = RM_.copy()
+    else:
+        X_RM[:,i] = np.mean(X[:,i])
+
+# predict with rf model
+y_RM = rf.predict(X_RM)
+# now plot
+plt.figure(2, facecolor='White',figsize=[5,5])
+ax = plt.subplot2grid((1,1),(0,0))
+ax.plot(RM_, y_RM,'-')
+ax.set_ylabel("Median house price / $1000s")
+ax.set_xlabel("Average number of rooms")
+plt.tight_layout()
+plt.savefig('test_partial_deps_1.png')
+plt.show()
+
+# Now let's look at another variable - house age
+AGE_ = np.linspace(np.min(X[:,6]),np.max(X[:,6]),100)
+X_AGE = np.zeros((AGE_.size,n_variables))
+for i in range(0,n_variables):
+    if i == 6:
+        X_AGE[:,i] = AGE_.copy()
+    else:
+        X_AGE[:,i] = np.mean(X[:,i])
+
+# predict with rf model
+y_AGE = rf.predict(X_AGE)
+# now plot
+plt.figure(3, facecolor='White',figsize=[5,5])
+ax = plt.subplot2grid((1,1),(0,0))
+ax.plot(AGE_, y_AGE,'-')
+ax.set_xlabel("percentage homes built prior to 1940")
+ax.set_ylabel("Median house price / $1000s")
+plt.tight_layout()
+plt.savefig('test_partial_deps_2.png')
+plt.show()
+
+
+# Really we would want to plot a number of lines for different combinations of
+# the other explanatory variables, rather than just the average, since the
+# relationship may not hold across the entire parameter space (and could be
+# quite different!)
